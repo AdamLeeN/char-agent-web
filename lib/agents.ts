@@ -1,3 +1,5 @@
+import { getApiBase, getModelPath, API_KEY } from './config';
+
 export interface Message {
   id: string;
   role: 'system' | 'user' | 'assistant';
