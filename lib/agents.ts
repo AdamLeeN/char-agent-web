@@ -1,8 +1,6 @@
-import { getApiBase, getModelPath, API_KEY } from './config';
-
 export interface Message {
   id: string;
-  role: 'user' | 'assistant';
+  role: 'system' | 'user' | 'assistant';
   content: string;
 }
 
@@ -10,12 +8,9 @@ export async function chat(messages: Message[], model: string = '0.6B'): Promise
   const apiBase = getApiBase(model);
   const modelPath = getModelPath(model);
   
-  const systemMsg = messages.find(m => m.role === 'system');
-  const chatMessages = messages.filter(m => m.role !== 'system');
-  
-  const body: any = {
+  const body = {
     model: modelPath,
-    messages: chatMessages,
+    messages: messages.map(m => ({ role: m.role === 'system' ? 'user' : m.role, content: m.content })),
     max_tokens: 200,
     temperature: 0.7
   };
