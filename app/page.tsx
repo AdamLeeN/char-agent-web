@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { chat, Message } from './lib/agents';
+import { chat, Message } from '../lib/agents';
 
 export default function Home() {
   const [model, setModel] = useState('0.6B');
