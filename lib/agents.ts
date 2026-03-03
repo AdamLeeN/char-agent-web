@@ -16,10 +16,7 @@ export async function chat(
   const apiBase = getApiBase(model);
   const modelPath = getModelPath(model);
   
-  // 获取角色配置
   const config = ROLE_CONFIG[roleId] || ROLE_CONFIG['程序员'];
-  
-  // 获取记忆
   const memoryContext = getMemoryContext(roleId);
   
   const systemPrompt = `你是${roleId}。
@@ -34,14 +31,14 @@ ${memoryContext}
     model: modelPath,
     messages: [
       { role: 'system', content: systemPrompt },
-      ...messages.map(m => ({ role: m.role === 'system' ? 'user' : m.role, content: m.content }))
+      ...messages.filter(m => m.role !== 'system').map(m => ({ role: m.role, content: m.content }))
     ],
     max_tokens: 200,
     temperature: 0.7
   };
   
   try {
-    const res = await fetch(`${apiBase}/chat/completions`, {
+    const res = await fetch(`${apiBase}/v1/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -53,7 +50,6 @@ ${memoryContext}
     const data = await res.json();
     const reply = data.choices?.[0]?.message?.content || '无响应';
     
-    // 添加到记忆
     const lastUserMsg = messages.findLast(m => m.role === 'user');
     if (lastUserMsg) {
       addMemory(roleId, 'user', lastUserMsg.content);

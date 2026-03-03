@@ -3,7 +3,8 @@
 export const API_HOST = 'https://controls-knife-larry-technologies.trycloudflare.com';
 
 export function getApiBase(model: string): string {
-  return API_HOST;
+  // FastAPI 后端统一入口
+  return `${API_HOST}`;
 }
 
 export function getModelPath(model: string): string {
