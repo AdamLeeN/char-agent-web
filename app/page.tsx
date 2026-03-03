@@ -2,9 +2,11 @@
 
 import { useState } from 'react';
 import { chat, Message } from '../lib/agents';
+import { ROLES } from '../lib/roles';
 
 export default function Home() {
   const [model, setModel] = useState('0.6B');
+  const [role, setRole] = useState('程序员');
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
@@ -24,7 +26,7 @@ export default function Home() {
     setLoading(true);
     
     try {
-      const reply = await chat([...messages, userMsg], model);
+      const reply = await chat([...messages, userMsg], model, role);
       const assistantMsg: Message = { id: (Date.now()+1).toString(), role: 'assistant', content: reply };
       setMessages(prev => [...prev, assistantMsg]);
     } catch (e) {
@@ -36,58 +38,91 @@ export default function Home() {
 
   return (
     <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', padding: '20px' }}>
-      <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+      <div style={{ maxWidth: '900px', margin: '0 auto' }}>
         <header style={{ background: 'white', padding: '20px', borderRadius: '12px', marginBottom: '20px', boxShadow: '0 2px 10px rgba(0,0,0,0.1)' }}>
           <h1 style={{ margin: 0, fontSize: '24px', color: '#333' }}>🎭 角色对话系统</h1>
-          <p style={{ margin: '5px 0 0', color: '#666', fontSize: '14px' }}>基于 Qwen3 多模型</p>
+          <p style={{ margin: '5px 0 0', color: '#666', fontSize: '14px' }}>基于 Qwen3 多模型 • 支持5种角色 • 记忆模块</p>
         </header>
 
-        <div style={{ background: 'white', padding: '15px', borderRadius: '12px', marginBottom: '20px', boxShadow: '0 2px 10px rgba(0,0,0,0.1)' }}>
-          <span style={{ marginRight: '10px', fontWeight: 'bold' }}>选择模型:</span>
-          {models.map(m => (
-            <button
-              key={m.value}
-              onClick={() => setModel(m.value)}
-              style={{
-                padding: '8px 16px',
-                marginRight: '8px',
-                border: 'none',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                background: model === m.value ? '#667eea' : '#eee',
-                color: model === m.value ? 'white' : '#333'
-              }}
-            >
-              {m.label}
-            </button>
-          ))}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '20px' }}>
+          {/* 模型选择 */}
+          <div style={{ background: 'white', padding: '15px', borderRadius: '12px', boxShadow: '0 2px 10px rgba(0,0,0,0.1)' }}>
+            <div style={{ fontWeight: 'bold', marginBottom: '10px' }}>🤖 选择模型</div>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              {models.map(m => (
+                <button
+                  key={m.value}
+                  onClick={() => setModel(m.value)}
+                  style={{
+                    padding: '8px 14px',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    background: model === m.value ? '#667eea' : '#eee',
+                    color: model === m.value ? 'white' : '#333',
+                    fontSize: '14px'
+                  }}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* 角色选择 */}
+          <div style={{ background: 'white', padding: '15px', borderRadius: '12px', boxShadow: '0 2px 10px rgba(0,0,0,0.1)' }}>
+            <div style={{ fontWeight: 'bold', marginBottom: '10px' }}>👤 选择角色</div>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              {ROLES.map(r => (
+                <button
+                  key={r.id}
+                  onClick={() => setRole(r.id)}
+                  style={{
+                    padding: '8px 14px',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    background: role === r.id ? '#667eea' : '#eee',
+                    color: role === r.id ? 'white' : '#333',
+                    fontSize: '14px'
+                  }}
+                >
+                  {r.icon} {r.name}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
-        <div style={{ background: 'white', borderRadius: '12px', padding: '20px', minHeight: '400px', boxShadow: '0 2px 10px rgba(0,0,0,0.1)' }}>
-          <div style={{ height: '350px', overflowY: 'auto', marginBottom: '15px', padding: '10px', background: '#f9f9f9', borderRadius: '8px' }}>
+        <div style={{ background: 'white', borderRadius: '12px', padding: '20px', minHeight: '500px', boxShadow: '0 2px 10px rgba(0,0,0,0.1)' }}>
+          <div style={{ height: '420px', overflowY: 'auto', marginBottom: '15px', padding: '10px', background: '#f9f9f9', borderRadius: '8px' }}>
             {messages.length === 0 ? (
-              <p style={{ textAlign: 'center', color: '#999', marginTop: '150px' }}>开始对话吧...</p>
+              <div style={{ textAlign: 'center', color: '#999', marginTop: '150px' }}>
+                <p>选择角色和模型，开始对话吧</p>
+                <p style={{ fontSize: '12px' }}>当前角色: {role} | 模型: {model}</p>
+              </div>
             ) : (
               messages.map(msg => (
                 <div key={msg.id} style={{ 
                   textAlign: msg.role === 'user' ? 'right' : 'left',
-                  marginBottom: '10px'
+                  marginBottom: '12px'
                 }}>
                   <div style={{
                     display: 'inline-block',
-                    maxWidth: '70%',
+                    maxWidth: '75%',
                     padding: '12px 16px',
                     borderRadius: '12px',
                     background: msg.role === 'user' ? '#667eea' : '#eee',
-                    color: msg.role === 'user' ? 'white' : '#333'
+                    color: msg.role === 'user' ? 'white' : '#333',
+                    textAlign: 'left'
                   }}>
-                    <strong>{msg.role === 'user' ? '你' : 'AI'}</strong>
-                    <p style={{ margin: '5px 0 0' }}>{msg.content}</p>
+                    <strong style={{ fontSize: '12px' }}>{msg.role === 'user' ? '你' : role}</strong>
+                    <p style={{ margin: '5px 0 0', whiteSpace: 'pre-wrap' }}>{msg.content}</p>
                   </div>
                 </div>
               ))
             )}
-            {loading && <p style={{ color: '#999' }}>思考中...</p>}
+            {loading && <p style={{ color: '#999' }}>⏳ 思考中...</p>}
           </div>
 
           <div style={{ display: 'flex', gap: '10px' }}>
@@ -96,7 +131,7 @@ export default function Home() {
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && send()}
-              placeholder="输入消息..."
+              placeholder={`以 ${role} 的身份提问...`}
               style={{ flex: 1, padding: '12px', borderRadius: '8px', border: '1px solid #ddd', fontSize: '16px' }}
             />
             <button
