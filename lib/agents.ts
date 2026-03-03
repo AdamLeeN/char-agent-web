@@ -1,5 +1,5 @@
 import { getApiBase, getModelPath, API_KEY } from './config';
-import { addToLongTermMemory, getRelevantMemory, evaluateImportance } from './memory';
+import { addToLongTermMemory, getRelevantMemory } from './memory';
 import { ROLE_CONFIG } from './roles';
 
 export interface Message {
@@ -10,13 +10,73 @@ export interface Message {
 
 // 去除思考标签内容
 function removeThinkingContent(text: string): string {
-  // 去除各种思考标签
   let result = text;
   result = result.replace(/<think>/gi, '');
   result = result.replace(/<\/think>/gi, '');
   result = result.replace(/<\|thought\|>/gi, '');
   result = result.replace(/<\|/gi, '');
   return result.trim();
+}
+
+// 评估重要性并总结（使用4B模型）
+async function evaluateAndSummarize(
+  messages: Message[], 
+  roleId: string
+): Promise<void> {
+  if (messages.length < 2) return;
+  
+  const apiBase = getApiBase('4B'); // 使用4B模型
+  const modelPath = getModelPath('4B');
+  
+  const prompt = `请分析以下对话，提取重要信息并判断重要性。
+
+要求：
+1. 提取重要信息点（用户的名字、爱好、职业、重要事件等）
+2. 给每个信息点重要性打分（0-10分）
+3. 只输出重要的信息（重要性>=7）
+
+格式：
+[信息1]|重要性分数
+[信息2]|重要性分数
+...
+
+对话：
+${messages.map(m => `${m.role === 'user' ? '用户' : roleId}: ${m.content}`).join('\n')}`;
+
+  try {
+    const res = await fetch(`${apiBase}/v1/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${API_KEY}`
+      },
+      body: JSON.stringify({
+        model: modelPath,
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: 300,
+        temperature: 0.3
+      })
+    });
+    
+    const data = await res.json();
+    let result = data.choices?.[0]?.message?.content || '';
+    result = removeThinkingContent(result);
+    
+    // 解析结果并保存
+    const lines = result.split('\n');
+    for (const line of lines) {
+      const match = line.match(/^(.+)\|(\d+)$/);
+      if (match) {
+        const content = match[1].trim();
+        const importance = parseInt(match[2]);
+        if (importance >= 7 && content) {
+          addToLongTermMemory(roleId, content, importance);
+        }
+      }
+    }
+  } catch (e) {
+    console.error('Evaluate failed:', e);
+  }
 }
 
 export async function chat(
@@ -38,7 +98,7 @@ export async function chat(
 
 ${memoryContext ? memoryContext + '\n' : ''}请用角色的语气和风格回答用户的问题。
 
-重要：不要输出思考过程，直接给出回答。`;
+重要：不要输出思考过程，直接给出简洁的回答。`;
 
   const body = {
     model: modelPath,
@@ -66,15 +126,9 @@ ${memoryContext ? memoryContext + '\n' : ''}请用角色的语气和风格回答
     // 去除思考内容
     reply = removeThinkingContent(reply);
     
-    // 获取用户最后的消息
-    const lastUserMsg = messages.findLast(m => m.role === 'user');
-    if (lastUserMsg) {
-      // 评估重要性并保存到长期记忆
-      const importance = evaluateImportance(lastUserMsg.content);
-      if (importance >= 6) {
-        addToLongTermMemory(roleId, `用户说: ${lastUserMsg.content}`, importance);
-      }
-    }
+    // 自动评估并保存重要信息（使用4B模型）
+    const allMessages = [...messages, { role: 'user', content: messages.findLast(m => m.role === 'user')?.content || '' }];
+    await evaluateAndSummarize(allMessages, roleId);
     
     return reply;
   } catch (e) {
@@ -83,49 +137,11 @@ ${memoryContext ? memoryContext + '\n' : ''}请用角色的语气和风格回答
   }
 }
 
-// 总结对话并保存重要内容
+// 手动总结按钮（备用）
 export async function summarizeAndSave(
   messages: Message[], 
   model: string = '0.6B',
   roleId: string = '程序员'
 ): Promise<void> {
-  if (messages.length < 2) return;
-  
-  const apiBase = getApiBase(model);
-  const modelPath = getModelPath(model);
-  
-  const prompt = `请总结以下对话，提取重要的信息点（如用户的名字、爱好、重要事件等）。每个信息点用一句话描述。
-
-对话：
-${messages.map(m => `${m.role === 'user' ? '用户' : roleId}: ${m.content}`).join('\n')}
-
-请直接输出总结，不需要额外说明。`;
-
-  try {
-    const res = await fetch(`${apiBase}/v1/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${API_KEY}`
-      },
-      body: JSON.stringify({
-        model: modelPath,
-        messages: [{ role: 'user', content: prompt }],
-        max_tokens: 200,
-        temperature: 0.5
-      })
-    });
-    
-    const data = await res.json();
-    let summary = data.choices?.[0]?.message?.content || '';
-    
-    // 去除思考内容
-    summary = removeThinkingContent(summary);
-    
-    if (summary) {
-      addToLongTermMemory(roleId, summary, 8); // 高重要性
-    }
-  } catch (e) {
-    console.error('Summary failed:', e);
-  }
+  await evaluateAndSummarize(messages, roleId);
 }

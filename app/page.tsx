@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { chat, summarizeAndSave, Message } from '../lib/agents';
+import { chat, Message } from '../lib/agents';
 import { ROLES } from '../lib/roles';
-import { loadFromLocalStorage, getAllMemory, clearLongTermMemory, getRelevantMemory } from '../lib/memory';
+import { loadFromLocalStorage, getAllMemory, clearLongTermMemory } from '../lib/memory';
 
 export default function Home() {
   const [model, setModel] = useState('0.6B');
@@ -31,21 +31,6 @@ export default function Home() {
   const clearSession = () => {
     setMessages([]);
     clearLongTermMemory(role);
-  };
-  
-  // 使用记忆模块
-  const useMemory = async () => {
-    if (messages.length === 0) return;
-    
-    setLoading(true);
-    try {
-      // 总结并保存重要内容
-      await summarizeAndSave(messages, model, role);
-      alert('✅ 记忆已保存到长期记忆模块！');
-    } catch (e) {
-      console.error(e);
-    }
-    setLoading(false);
   };
 
   const send = async () => {
@@ -80,7 +65,7 @@ export default function Home() {
       <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
         <header style={{ background: 'white', padding: '20px', borderRadius: '12px', marginBottom: '20px', boxShadow: '0 2px 10px rgba(0,0,0,0.1)' }}>
           <h1 style={{ margin: 0, fontSize: '24px', color: '#333' }}>🎭 角色对话系统</h1>
-          <p style={{ margin: '5px 0 0', color: '#666', fontSize: '14px' }}>基于 Qwen3 • 5种角色 • 长短期记忆模块</p>
+          <p style={{ margin: '5px 0 0', color: '#666', fontSize: '14px' }}>基于 Qwen3 • 5种角色 • 自动记忆模块（4B模型评估）</p>
         </header>
 
         <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '15px', marginBottom: '20px' }}>
@@ -143,13 +128,6 @@ export default function Home() {
               {showMemory ? '📖 隐藏记忆' : `📖 记忆 (${memories.length})`}
             </button>
             <button
-              onClick={useMemory}
-              disabled={loading || messages.length === 0}
-              style={{ padding: '10px', background: '#2196F3', color: 'white', border: 'none', borderRadius: '8px', cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.6 : 1 }}
-            >
-              💾 使用记忆
-            </button>
-            <button
               onClick={clearSession}
               style={{ padding: '10px', background: '#f44336', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer' }}
             >
@@ -164,7 +142,7 @@ export default function Home() {
               <div style={{ textAlign: 'center', color: '#999', marginTop: '150px' }}>
                 <p>选择角色和模型，开始对话吧</p>
                 <p style={{ fontSize: '12px' }}>当前角色: {role} | 模型: {model}</p>
-                <p style={{ fontSize: '12px', color: '#4CAF50' }}>💡 点击"使用记忆"可保存重要对话到长期记忆</p>
+                <p style={{ fontSize: '12px', color: '#4CAF50' }}>💡 系统会自动使用4B模型评估并保存重要对话到记忆</p>
               </div>
             ) : (
               messages.map(msg => (
@@ -187,7 +165,7 @@ export default function Home() {
                 </div>
               ))
             )}
-            {loading && <p style={{ color: '#999' }}>⏳ 思考中...</p>}
+            {loading && <p style={{ color: '#999' }}>⏳ 思考中...（4B模型正在评估重要信息）</p>}
           </div>
 
           <div style={{ display: 'flex', gap: '10px' }}>
@@ -212,20 +190,21 @@ export default function Home() {
         {/* 记忆模块显示 */}
         {showMemory && (
           <div style={{ background: 'white', borderRadius: '12px', padding: '20px', marginTop: '20px', boxShadow: '0 2px 10px rgba(0,0,0,0.1)' }}>
-            <h3 style={{ marginTop: 0 }}>📖 长期记忆 ({role})</h3>
+            <h3 style={{ marginTop: 0 }}>📖 长期记忆 ({role}) - 4B模型自动评估</h3>
             {memories.length === 0 ? (
-              <p style={{ color: '#999' }}>暂无记忆。点击"使用记忆"按钮保存重要对话。</p>
+              <p style={{ color: '#999' }}>暂无记忆。对话结束后系统会自动评估并保存重要信息。</p>
             ) : (
               <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
                 {memories.map((m, i) => (
                   <div key={i} style={{ padding: '10px', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span>{m.content}</span>
+                    <span style={{ flex: 1 }}>{m.content}</span>
                     <span style={{ 
-                      background: m.importance >= 8 ? '#4CAF50' : m.importance >= 6 ? '#FF9800' : '#9E9E9E',
+                      background: m.importance >= 8 ? '#4CAF50' : m.importance >= 7 ? '#FF9800' : '#9E9E9E',
                       color: 'white',
                       padding: '2px 8px',
                       borderRadius: '10px',
-                      fontSize: '12px'
+                      fontSize: '12px',
+                      marginLeft: '10px'
                     }}>
                       ⭐{m.importance}
                     </span>
