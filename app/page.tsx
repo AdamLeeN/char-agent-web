@@ -72,7 +72,7 @@ export default function Home() {
     <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', padding: '20px' }}>
       <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
         <header style={{ background: 'white', padding: '20px', borderRadius: '12px', marginBottom: '20px', boxShadow: '0 2px 10px rgba(0,0,0,0.1)' }}>
-          <h1 style={{ margin: 0, fontSize: '24px', color: '#333' }}>🎭 角色对话系统</h1>
+          <h1 style={{ margin: 0, fontSize: '24px', color: '#333' }}>// 角色对话系统</h1>
           <p style={{ margin: '5px 0 0', color: '#666', fontSize: '14px' }}>基于 Qwen3 • 5种角色 • 自动记忆模块</p>
         </header>
 
