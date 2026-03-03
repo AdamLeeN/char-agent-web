@@ -10,11 +10,13 @@ export interface Message {
 
 // 去除思考标签内容
 function removeThinkingContent(text: string): string {
-  // 去除 <think>...</think> 或类似标签
-  return text.replace(/<think>[\s\S]*?<\/think>/gi, '')
-             .replace(/<think>[\s\S]*?</think>/gi, '')
-             .replace(/<思考>[\s\S]*?<\/思考>/gi, '')
-             .trim();
+  // 去除各种思考标签
+  let result = text;
+  result = result.replace(/<think>/gi, '');
+  result = result.replace(/<\/think>/gi, '');
+  result = result.replace(/<\|thought\|>/gi, '');
+  result = result.replace(/<\|/gi, '');
+  return result.trim();
 }
 
 export async function chat(
@@ -115,7 +117,10 @@ ${messages.map(m => `${m.role === 'user' ? '用户' : roleId}: ${m.content}`).jo
     });
     
     const data = await res.json();
-    const summary = data.choices?.[0]?.message?.content;
+    let summary = data.choices?.[0]?.message?.content || '';
+    
+    // 去除思考内容
+    summary = removeThinkingContent(summary);
     
     if (summary) {
       addToLongTermMemory(roleId, summary, 8); // 高重要性
