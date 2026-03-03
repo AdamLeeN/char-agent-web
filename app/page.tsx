@@ -5,6 +5,18 @@ import { chat, Message } from '../lib/agents';
 import { ROLES } from '../lib/roles';
 import { loadFromLocalStorage, getAllMemory, clearLongTermMemory } from '../lib/memory';
 
+// 提取思考内容
+function extractThinking(text: string): { thinking: string; content: string } {
+  const thinkingMatch = text.match(/<think>([\s\S]*?)<\/think>/);
+  if (thinkingMatch) {
+    return {
+      thinking: thinkingMatch[1].trim(),
+      content: text.replace(/<think>[\s\S]*?<\/think>/, '').trim()
+    };
+  }
+  return { thinking: '', content: text };
+}
+
 export default function Home() {
   const [model, setModel] = useState('0.6B');
   const [role, setRole] = useState('程序员');
@@ -145,25 +157,49 @@ export default function Home() {
                 <p style={{ fontSize: '12px', color: '#4CAF50' }}>💡 系统会自动使用4B模型评估并保存重要对话到记忆</p>
               </div>
             ) : (
-              messages.map(msg => (
-                <div key={msg.id} style={{ 
-                  textAlign: msg.role === 'user' ? 'right' : 'left',
-                  marginBottom: '12px'
-                }}>
-                  <div style={{
-                    display: 'inline-block',
-                    maxWidth: '75%',
-                    padding: '12px 16px',
-                    borderRadius: '12px',
-                    background: msg.role === 'user' ? '#667eea' : '#eee',
-                    color: msg.role === 'user' ? 'white' : '#333',
-                    textAlign: 'left'
+              messages.map(msg => {
+                const { thinking, content } = extractThinking(msg.content);
+                return (
+                  <div key={msg.id} style={{ 
+                    textAlign: msg.role === 'user' ? 'right' : 'left',
+                    marginBottom: '12px'
                   }}>
-                    <strong style={{ fontSize: '12px' }}>{msg.role === 'user' ? '你' : role}</strong>
-                    <p style={{ margin: '5px 0 0', whiteSpace: 'pre-wrap' }}>{msg.content}</p>
+                    <div style={{
+                      display: 'inline-block',
+                      maxWidth: '80%',
+                      padding: '12px 16px',
+                      borderRadius: '12px',
+                      background: msg.role === 'user' ? '#667eea' : '#eee',
+                      color: msg.role === 'user' ? 'white' : '#333',
+                      textAlign: 'left'
+                    }}>
+                      <strong style={{ fontSize: '12px' }}>{msg.role === 'user' ? '你' : role}</strong>
+                      
+                      {/* 思考内容 */}
+                      {thinking && (
+                        <div style={{ 
+                          marginTop: '8px', 
+                          padding: '8px', 
+                          background: 'rgba(0,0,0,0.05)', 
+                          borderRadius: '6px',
+                          borderLeft: '3px solid #FF9800',
+                          fontSize: '13px',
+                          color: '#666',
+                          fontStyle: 'italic'
+                        }}>
+                          <span style={{ fontSize: '11px', color: '#FF9800', fontWeight: 'bold' }}>💭 思考</span>
+                          <p style={{ margin: '4px 0 0', whiteSpace: 'pre-wrap' }}>{thinking}</p>
+                        </div>
+                      )}
+                      
+                      {/* 正式内容 */}
+                      {content && (
+                        <p style={{ margin: thinking ? '8px 0 0', whiteSpace: 'pre-wrap' }}>{content}</p>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))
+                );
+              })
             )}
             {loading && <p style={{ color: '#999' }}>⏳ 思考中...（4B模型正在评估重要信息）</p>}
           </div>
