@@ -1,47 +1,34 @@
-// 简单的记忆模块
-const memoryStore: Record<string, { role: string; content: string; timestamp: number }[]> = {};
+// 长期记忆存储
+const longTermMemory: Record<string, { content: string; importance: number; timestamp: number }[]> = {};
 
-export function getMemory(agentId: string): { role: string; content: string; timestamp: number }[] {
-  if (!memoryStore[agentId]) {
-    memoryStore[agentId] = [];
+// 获取长期记忆
+export function getLongTermMemory(agentId: string): { content: string; importance: number; timestamp: number }[] {
+  if (!longTermMemory[agentId]) {
+    longTermMemory[agentId] = [];
   }
-  return memoryStore[agentId];
+  return longTermMemory[agentId];
 }
 
-export function addMemory(agentId: string, role: string, content: string) {
-  if (!memoryStore[agentId]) {
-    memoryStore[agentId] = [];
+// 添加到长期记忆（带重要性评分）
+export function addToLongTermMemory(agentId: string, content: string, importance: number) {
+  if (!longTermMemory[agentId]) {
+    longTermMemory[agentId] = [];
   }
-  memoryStore[agentId].push({ role, content, timestamp: Date.now() });
+  longTermMemory[agentId].push({
+    content,
+    importance,
+    timestamp: Date.now()
+  });
   
-  // 只保留最近10条记忆
-  if (memoryStore[agentId].length > 10) {
-    memoryStore[agentId] = memoryStore[agentId].slice(-10);
+  // 最多保留20条长期记忆
+  if (longTermMemory[agentId].length > 20) {
+    // 按重要性排序，保留最重要的
+    longTermMemory[agentId].sort((a, b) => b.importance - a.importance);
+    longTermMemory[agentId] = longTermMemory[agentId].slice(0, 20);
   }
   
   // 保存到 localStorage
   saveToLocalStorage(agentId);
-}
-
-export function clearMemory(agentId: string) {
-  memoryStore[agentId] = [];
-  localStorage.removeItem(`memory_${agentId}`);
-}
-
-export function getMemoryContext(agentId: string): string {
-  const memories = getMemory(agentId);
-  if (memories.length === 0) return '';
-  
-  return `相关记忆:\n${memories.map(m => `- ${m.content}`).join('\n')}`;
-}
-
-// 保存到 localStorage
-function saveToLocalStorage(agentId: string) {
-  try {
-    localStorage.setItem(`memory_${agentId}`, JSON.stringify(memoryStore[agentId]));
-  } catch (e) {
-    console.error('Failed to save memory:', e);
-  }
 }
 
 // 从 localStorage 加载
@@ -49,14 +36,56 @@ export function loadFromLocalStorage(agentId: string) {
   try {
     const stored = localStorage.getItem(`memory_${agentId}`);
     if (stored) {
-      memoryStore[agentId] = JSON.parse(stored);
+      longTermMemory[agentId] = JSON.parse(stored);
     }
   } catch (e) {
     console.error('Failed to load memory:', e);
   }
 }
 
+// 保存到 localStorage
+function saveToLocalStorage(agentId: string) {
+  try {
+    localStorage.setItem(`memory_${agentId}`, JSON.stringify(longTermMemory[agentId]));
+  } catch (e) {
+    console.error('Failed to save memory:', e);
+  }
+}
+
+// 清除记忆
+export function clearLongTermMemory(agentId: string) {
+  longTermMemory[agentId] = [];
+  localStorage.removeItem(`memory_${agentId}`);
+}
+
 // 获取所有记忆（用于显示）
 export function getAllMemory(agentId: string) {
-  return getMemory(agentId);
+  return getLongTermMemory(agentId);
+}
+
+// 获取用于对话上下文的记忆（高重要性的）
+export function getRelevantMemory(agentId: string): string {
+  const memories = getLongTermMemory(agentId);
+  // 只返回重要性 >= 7 的记忆
+  const relevant = memories.filter(m => m.importance >= 7);
+  if (relevant.length === 0) return '';
+  
+  return `重要记忆:\n${relevant.map(m => `- ${m.content}`).join('\n')}`;
+}
+
+// 评估内容重要性 (0-10)
+export function evaluateImportance(content: string): number {
+  const importantKeywords = ['名字', '生日', '爱好', '职业', '梦想', '恐惧', '秘密', '重要', '记住'];
+  const unimportantKeywords = ['好的', '明白', '谢谢', '是的', '嗯', '啊', '随便'];
+  
+  let score = 5; // 默认中等
+  
+  for (const kw of importantKeywords) {
+    if (content.includes(kw)) score += 2;
+  }
+  for (const kw of unimportantKeywords) {
+    if (content.includes(kw)) score -= 1;
+  }
+  
+  return Math.max(0, Math.min(10, score));
 }

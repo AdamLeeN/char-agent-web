@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { chat, Message } from '../lib/agents';
+import { chat, summarizeAndSave, Message } from '../lib/agents';
 import { ROLES } from '../lib/roles';
-import { loadFromLocalStorage, getAllMemory, clearMemory, addMemory } from '../lib/memory';
+import { loadFromLocalStorage, getAllMemory, clearLongTermMemory, getRelevantMemory } from '../lib/memory';
 
 export default function Home() {
   const [model, setModel] = useState('0.6B');
@@ -21,44 +21,31 @@ export default function Home() {
   // 切换角色时新建session
   const handleRoleChange = (newRole: string) => {
     if (newRole !== role) {
-      // 保存当前对话到 localStorage
-      saveSession(role, messages);
-      // 清除新角色的记忆并加载
-      loadFromLocalStorage(newRole);
-      // 清空当前对话
       setMessages([]);
+      loadFromLocalStorage(newRole);
       setRole(newRole);
     }
-  };
-  
-  // 保存对话到 localStorage
-  const saveSession = (roleId: string, msgs: Message[]) => {
-    try {
-      localStorage.setItem(`session_${roleId}`, JSON.stringify(msgs));
-    } catch (e) {
-      console.error('Failed to save session:', e);
-    }
-  };
-  
-  // 加载对话
-  const loadSession = (roleId: string) => {
-    try {
-      const stored = localStorage.getItem(`session_${roleId}`);
-      if (stored) {
-        return JSON.parse(stored);
-      }
-    } catch (e) {
-      console.error('Failed to load session:', e);
-    }
-    return [];
   };
   
   // 清除对话
   const clearSession = () => {
     setMessages([]);
-    clearMemory(role);
-    localStorage.removeItem(`session_${role}`);
-    localStorage.removeItem(`memory_${role}`);
+    clearLongTermMemory(role);
+  };
+  
+  // 使用记忆模块
+  const useMemory = async () => {
+    if (messages.length === 0) return;
+    
+    setLoading(true);
+    try {
+      // 总结并保存重要内容
+      await summarizeAndSave(messages, model, role);
+      alert('✅ 记忆已保存到长期记忆模块！');
+    } catch (e) {
+      console.error(e);
+    }
+    setLoading(false);
   };
 
   const send = async () => {
@@ -86,12 +73,14 @@ export default function Home() {
     { value: '4B', label: '🧠 4B' }
   ];
 
+  const memories = getAllMemory(role);
+
   return (
     <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', padding: '20px' }}>
       <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
         <header style={{ background: 'white', padding: '20px', borderRadius: '12px', marginBottom: '20px', boxShadow: '0 2px 10px rgba(0,0,0,0.1)' }}>
           <h1 style={{ margin: 0, fontSize: '24px', color: '#333' }}>🎭 角色对话系统</h1>
-          <p style={{ margin: '5px 0 0', color: '#666', fontSize: '14px' }}>基于 Qwen3 • 5种角色 • 记忆模块 • Session存储</p>
+          <p style={{ margin: '5px 0 0', color: '#666', fontSize: '14px' }}>基于 Qwen3 • 5种角色 • 长短期记忆模块</p>
         </header>
 
         <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '15px', marginBottom: '20px' }}>
@@ -151,7 +140,14 @@ export default function Home() {
               onClick={() => setShowMemory(!showMemory)}
               style={{ padding: '10px', background: '#4CAF50', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer' }}
             >
-              {showMemory ? '📖 隐藏记忆' : '📖 查看记忆'}
+              {showMemory ? '📖 隐藏记忆' : `📖 记忆 (${memories.length})`}
+            </button>
+            <button
+              onClick={useMemory}
+              disabled={loading || messages.length === 0}
+              style={{ padding: '10px', background: '#2196F3', color: 'white', border: 'none', borderRadius: '8px', cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.6 : 1 }}
+            >
+              💾 使用记忆
             </button>
             <button
               onClick={clearSession}
@@ -168,6 +164,7 @@ export default function Home() {
               <div style={{ textAlign: 'center', color: '#999', marginTop: '150px' }}>
                 <p>选择角色和模型，开始对话吧</p>
                 <p style={{ fontSize: '12px' }}>当前角色: {role} | 模型: {model}</p>
+                <p style={{ fontSize: '12px', color: '#4CAF50' }}>💡 点击"使用记忆"可保存重要对话到长期记忆</p>
               </div>
             ) : (
               messages.map(msg => (
@@ -215,14 +212,23 @@ export default function Home() {
         {/* 记忆模块显示 */}
         {showMemory && (
           <div style={{ background: 'white', borderRadius: '12px', padding: '20px', marginTop: '20px', boxShadow: '0 2px 10px rgba(0,0,0,0.1)' }}>
-            <h3 style={{ marginTop: 0 }}>📖 当前记忆 ({role})</h3>
-            {getAllMemory(role).length === 0 ? (
-              <p style={{ color: '#999' }}>暂无记忆</p>
+            <h3 style={{ marginTop: 0 }}>📖 长期记忆 ({role})</h3>
+            {memories.length === 0 ? (
+              <p style={{ color: '#999' }}>暂无记忆。点击"使用记忆"按钮保存重要对话。</p>
             ) : (
               <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
-                {getAllMemory(role).map((m, i) => (
-                  <div key={i} style={{ padding: '8px', borderBottom: '1px solid #eee' }}>
-                    <strong>{m.role}:</strong> {m.content}
+                {memories.map((m, i) => (
+                  <div key={i} style={{ padding: '10px', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>{m.content}</span>
+                    <span style={{ 
+                      background: m.importance >= 8 ? '#4CAF50' : m.importance >= 6 ? '#FF9800' : '#9E9E9E',
+                      color: 'white',
+                      padding: '2px 8px',
+                      borderRadius: '10px',
+                      fontSize: '12px'
+                    }}>
+                      ⭐{m.importance}
+                    </span>
                   </div>
                 ))}
               </div>
